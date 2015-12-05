@@ -1,7 +1,38 @@
 from grab import Grab
 import psycopg2
 import os
+import urllib.request
+import gc
 
+def downloadpage(url):
+    for j in range(1, 6):
+        try:
+            html = urllib.request.urlopen(url).read()
+        except urllib.request.HTTPError:
+            try:
+                html = urllib.request.urlopen(url).read()
+            except Exception as e:
+                # html = 'Error 404'
+                f = open(str(i) + '.html', 'wb')
+                f.close()
+                if e.code:
+                    print("Error " + str(e.code) + ": " + url)
+                break
+            else:
+                f = open(str(i) + '.html', 'wb')
+                f.write(html)
+                f.close()
+                print("Downloaded: " + url)
+                break
+        except Exception:
+            print ("Waiting " + str(5 * j) + " seconds...")
+            time.sleep(5 * j)
+        else:
+            f = open(str(i) + '.html', 'wb')
+            f.write(html)
+            f.close()
+            print("Downloaded: " + url)
+            break
 
 def debugoutput():
     global header
@@ -69,28 +100,41 @@ def formatdate(d):
     newdate = yyyy + '-' + mm + '-' + dd
     return newdate
 
-db = psycopg2.connect(database='db_name', user='username', host='db_ip', port=db_port)
+db = psycopg2.connect(database='dn_name', user='db_username', host='127.0.0.1', port=db_port)
 
 cur = db.cursor()
+os.chdir('workspace_dir')
 
-firtstitem = 1
-lastitem = 1000
-for i in range(firstitem, lastitem):
-    if os.path.getsize(str(i) + '.html') < 5400:  # Draft or 404 Error
-        continue
-    g = Grab(open(str(i) + '.html', 'rb').read())
+
+for i in range(38902, 268278):
+    print(i)
+    try:
+        if os.path.getsize(str(i) + '.html') < 5500:  # Draft or 404 Error
+            continue
+    except FileNotFoundError:
+        print('File {0}.html not found.\nTrying to download.'.format(str(i)))
+        url = 'http://habrahabr.ru/post/' + str(i)
+        downloadpage(url)
+        if os.path.getsize(str(i) + '.html') < 5500:  # Draft or 404 Error
+            continue
+    f = open(str(i) + '.html', 'rb')
+    g = Grab(f.read())
+    f.close()
 
     # Header
-    header = g.doc.select('//h1[@class="title"]').text()
+    try:
+        header = g.doc.select('//h1[@class="title"]').text()
+    except:
+        header = g.doc.select('//span[@class="post_title"]').text()
 
     # Topic
     topic = g.doc.select('//div[@class="content html_format"]').text()
 
     # Author
     try:
-        author = g.doc.select('//a[@class="author-info__nickname"]').text()
+        author = g.doc.select('//*[@class="author-info__nickname"]').text()
     except:
-        author = g.doc.select('//span[@class="author-info__name"]').text()
+        author = g.doc.select('//*[@class="author-info__name"]').text()
     if author[0] == '@':
         author = author[1::]
     author_id = authoradd(author)
@@ -164,6 +208,7 @@ for i in range(firstitem, lastitem):
         finally:
             commentauthorid = authoradd(commentauthor)
             # print(commentauthor)
+
         # DB filling
 
         SQL = '''INSERT INTO comments_table\
@@ -173,4 +218,5 @@ for i in range(firstitem, lastitem):
         j += 1
 
     db.commit()
+    gc.collect()
     # debugoutput()
