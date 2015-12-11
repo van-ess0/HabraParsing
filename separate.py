@@ -92,6 +92,9 @@ def formatdate(d):
         int(yyyy)
     except:
         yyyy = '1970'
+        if i > 247197:
+            yyyy = '2015'
+
     mounth = {'января': '01',
               'февраля': '02',
               'марта': '03',
@@ -113,13 +116,21 @@ def getheader():
     try:
         header = g.doc.select('//h1[@class="title"]').text()
     except:
-        header = g.doc.select('//span[@class="post_title"]').text()
+        try:
+            header = g.doc.select('//span[@class="post_title"]').text()
+        except:
+            header = g.doc.select('//h1[@class="megapost-head__title"]').text()
+        finally:
+            return header
     finally:
         return header
 
 
 def gettopic():
-    topic = g.doc.select('//div[@class="content html_format"]').text()
+    try:
+        topic = g.doc.select('//div[@class="content html_format"]').text()
+    except:
+        topic = g.doc.select('//div[@class="content-text"]').text()
     return topic
 
 
@@ -127,8 +138,10 @@ def getauthor():
     try:
         author = g.doc.select('//*[@class="author-info__nickname"]').text()
     except:
-        author = g.doc.select('//*[@class="author-info__name"]').text()
-
+        try:
+            author = g.doc.select('//*[@class="author-info__name"]').text()
+        except:
+            author = g.doc.select('//*[@class="megapost-cover__blog-link"]').text()
     if author[0] == '@':
         author = author[1::]
     return author
@@ -147,7 +160,10 @@ def getraiting():
 
 
 def getdate():
-    date = g.doc.select('//div[@class="published"]').text()
+    try:
+        date = g.doc.select('//div[@class="published"]').text()
+    except:
+        date = g.doc.select('//ul[@class="list list_inline"]/li[@class="list__item"][1]').text()
     return formatdate(date)
 
 
@@ -176,9 +192,11 @@ def filltagstable():
 
 
 def getnumberofcomments():
-    numberofcomments = g.doc.select('//span[@id="comments_count"]').text()
-    return numberofcomments
-
+    try:
+        numberofcomments = g.doc.select('//span[@id="comments_count"]').text()
+        return numberofcomments
+    except:
+        return 0
 
 def fillnumberofcomments():
     SQL = '''UPDATE article_table SET article_comments_number = {0} WHERE article_id={1}'''
@@ -236,13 +254,15 @@ def fillcommentstable():
 
 
 # MAIN
-db = psycopg2.connect(database='db_name', user='db_username', host='db_ip', port=db_port)
+gc.enable()
+
+db = psycopg2.connect(database='', user='', host='', port=)
 
 cur = db.cursor()
-os.chdir('path_to_pages')
+# os.chdir('')
 g = Grab
 
-for i in range(1, 268278):    # 268278
+for i in range(258593, 268278):    # 268278
     print(i)
     try:
         if os.path.getsize(str(i) + '.html') < 5500:  # Draft or 404 Error
@@ -292,7 +312,8 @@ for i in range(1, 268278):    # 268278
     # Comments
     numberofcomments = getnumberofcomments()
     fillnumberofcomments()
-    fillcommentstable()
+    if int(numberofcomments) > 0:
+        fillcommentstable()
 
     db.commit()
     # gc.collect()
